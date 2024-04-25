@@ -5,13 +5,11 @@ local api = vim.api
 local validate = vim.validate
 local M = {}
 
---- bufnr → true|nil
---- to throttle refreshes to at most one at a time
-local active_refreshes = {} --- @type table<integer,true>
-
----@type table<integer, table<integer, lsp.CodeLens[]>>
---- bufnr -> client_id -> lenses
-local lens_cache_by_buf = {}
+---@class (private) vim.lsp.codelens.bufstate
+---@field refreshing? true To throttle refreshes to at most one at a time
+---@field client_lenses? table<integer, lsp.CodeLens[]> client_id -> lenses
+---@type table<integer, vim.lsp.codelens.bufstate>
+local bufstates = {}
 
 ---@type table<integer, integer> client_id -> namespace
 local namespaces = vim.defaulttable(function(key)
@@ -63,7 +61,8 @@ end
 ---@return lsp.CodeLens[]
 function M.get(bufnr)
   bufnr = resolve_bufnr(bufnr)
-  local lenses_by_client = lens_cache_by_buf[bufnr]
+  local bufstate = bufstates[bufnr] or {}
+  local lenses_by_client = bufstate.client_lenses
   if not lenses_by_client then
     return {}
   end
@@ -79,8 +78,9 @@ end
 function M.run()
   local line = api.nvim_win_get_cursor(0)[1]
   local bufnr = api.nvim_get_current_buf()
+  local bufstate = bufstates[bufnr] or {}
   local options = {} --- @type {client: integer, lens: lsp.CodeLens}[]
-  local lenses_by_client = lens_cache_by_buf[bufnr] or {}
+  local lenses_by_client = bufstate.client_lenses or {}
   for client, lenses in pairs(lenses_by_client) do
     for _, lens in pairs(lenses) do
       if lens.range.start.line == (line - 1) and lens.command and lens.command.command ~= '' then
@@ -123,11 +123,12 @@ function M.clear(client_id, bufnr)
   end
   for _, iter_bufnr in pairs(buffers) do
     local client_ids = client_id and { client_id } or vim.tbl_keys(namespaces)
+    local bufstate = bufstates[iter_bufnr] or {}
     for _, iter_client_id in pairs(client_ids) do
       local ns = namespaces[iter_client_id]
       -- there can be display()ed lenses, which are not stored in cache
-      if lens_cache_by_buf[iter_bufnr] then
-        lens_cache_by_buf[iter_bufnr][iter_client_id] = {}
+      if bufstate.client_lenses then
+        bufstate.client_lenses[iter_client_id] = {}
       end
       api.nvim_buf_clear_namespace(iter_bufnr, ns, 0, -1)
     end
@@ -195,14 +196,18 @@ function M.save(lenses, bufnr, client_id)
     return
   end
 
-  local lenses_by_client = lens_cache_by_buf[bufnr]
+  local bufstate = bufstates[bufnr] or {}
+  local lenses_by_client = bufstate.client_lenses
   if not lenses_by_client then
     lenses_by_client = {}
-    lens_cache_by_buf[bufnr] = lenses_by_client
+    bufstate.client_lenses = lenses_by_client
+    bufstates[bufnr] = bufstate
     local ns = namespaces[client_id]
     api.nvim_buf_attach(bufnr, false, {
       on_detach = function(_, b)
-        lens_cache_by_buf[b] = nil
+        if bufstates[b] then
+          bufstates[b].client_lenses = nil
+        end
       end,
       on_lines = function(_, b, _, first_lnum, last_lnum)
         api.nvim_buf_clear_namespace(b, ns, first_lnum, last_lnum)
@@ -268,8 +273,9 @@ end
 ---@param result lsp.CodeLens[]
 ---@param ctx lsp.HandlerContext
 function M.on_codelens(err, result, ctx, _)
+  local bufstate = bufstates[assert(ctx.bufnr)] or {}
   if err then
-    active_refreshes[assert(ctx.bufnr)] = nil
+    bufstate.refreshing = nil
     log.error('codelens', err)
     return
   end
@@ -280,7 +286,7 @@ function M.on_codelens(err, result, ctx, _)
   -- once resolved.
   M.display(result, ctx.bufnr, ctx.client_id)
   resolve_lenses(result, ctx.bufnr, ctx.client_id, function()
-    active_refreshes[assert(ctx.bufnr)] = nil
+    bufstate.refreshing = nil
     M.display(result, ctx.bufnr, ctx.client_id)
   end)
 end
@@ -312,15 +318,20 @@ function M.refresh(opts)
   end
 
   for _, buf in ipairs(buffers) do
-    if not active_refreshes[buf] then
+    local bufstate = bufstates[buf]
+    if not bufstate then
+      bufstate = {}
+      bufstates[buf] = bufstate
+    end
+    if not bufstate.refreshing then
       local params = {
         textDocument = util.make_text_document_params(buf),
       }
-      active_refreshes[buf] = true
+      bufstate.refreshing = true
 
       local request_ids = vim.lsp.buf_request(buf, ms.textDocument_codeLens, params, M.on_codelens)
       if vim.tbl_isempty(request_ids) then
-        active_refreshes[buf] = nil
+        bufstate.refreshing = nil
       end
     end
   end
