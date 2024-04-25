@@ -17,15 +17,10 @@ local lens_cache_by_buf = setmetatable({}, {
   end,
 })
 
----@type table<integer, integer>
----client_id -> namespace
-local namespaces = setmetatable({}, {
-  __index = function(t, key)
-    local value = api.nvim_create_namespace('vim_lsp_codelens:' .. key)
-    rawset(t, key, value)
-    return value
-  end,
-})
+---@type table<integer, integer> client_id -> namespace
+local namespaces = vim.defaulttable(function(key)
+  return api.nvim_create_namespace('vim_lsp_codelens:' .. key)
+end)
 
 ---@private
 M.__namespaces = namespaces
