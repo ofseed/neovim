@@ -11,12 +11,7 @@ local active_refreshes = {} --- @type table<integer,true>
 
 ---@type table<integer, table<integer, lsp.CodeLens[]>>
 --- bufnr -> client_id -> lenses
-local lens_cache_by_buf = setmetatable({}, {
-  __index = function(t, b)
-    local key = b > 0 and b or api.nvim_get_current_buf()
-    return rawget(t, key)
-  end,
-})
+local lens_cache_by_buf = {}
 
 ---@type table<integer, integer> client_id -> namespace
 local namespaces = vim.defaulttable(function(key)
@@ -67,7 +62,8 @@ end
 ---@param bufnr integer  Buffer number. 0 can be used for the current buffer.
 ---@return lsp.CodeLens[]
 function M.get(bufnr)
-  local lenses_by_client = lens_cache_by_buf[bufnr or 0]
+  bufnr = resolve_bufnr(bufnr)
+  local lenses_by_client = lens_cache_by_buf[bufnr]
   if not lenses_by_client then
     return {}
   end
@@ -194,6 +190,7 @@ end
 ---@param bufnr integer
 ---@param client_id integer
 function M.save(lenses, bufnr, client_id)
+  bufnr = resolve_bufnr(bufnr)
   if not api.nvim_buf_is_loaded(bufnr) then
     return
   end
