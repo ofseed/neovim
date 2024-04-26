@@ -62,13 +62,13 @@ end
 function M.get(bufnr)
   bufnr = resolve_bufnr(bufnr)
   local bufstate = bufstates[bufnr] or {}
-  local lenses_by_client = bufstate.client_lenses
-  if not lenses_by_client then
+  local client_lenses = bufstate.client_lenses
+  if not client_lenses then
     return {}
   end
   local lenses = {}
-  for _, client_lenses in pairs(lenses_by_client) do
-    vim.list_extend(lenses, client_lenses)
+  for _, iter_lenses in pairs(client_lenses) do
+    vim.list_extend(lenses, iter_lenses)
   end
   return lenses
 end
@@ -80,8 +80,8 @@ function M.run()
   local bufnr = api.nvim_get_current_buf()
   local bufstate = bufstates[bufnr] or {}
   local options = {} --- @type {client: integer, lens: lsp.CodeLens}[]
-  local lenses_by_client = bufstate.client_lenses or {}
-  for client, lenses in pairs(lenses_by_client) do
+  local client_lenses = bufstate.client_lenses or {}
+  for client, lenses in pairs(client_lenses) do
     for _, lens in pairs(lenses) do
       if lens.range.start.line == (line - 1) and lens.command and lens.command.command ~= '' then
         table.insert(options, { client = client, lens = lens })
@@ -151,18 +151,18 @@ function M.display(lenses, bufnr, client_id)
     return
   end
 
-  local lenses_by_lnum = {} ---@type table<integer, lsp.CodeLens[]>
+  local lnum_lenses = {} ---@type table<integer, lsp.CodeLens[]>
   for _, lens in pairs(lenses) do
-    local line_lenses = lenses_by_lnum[lens.range.start.line]
+    local line_lenses = lnum_lenses[lens.range.start.line]
     if not line_lenses then
       line_lenses = {}
-      lenses_by_lnum[lens.range.start.line] = line_lenses
+      lnum_lenses[lens.range.start.line] = line_lenses
     end
     table.insert(line_lenses, lens)
   end
   local num_lines = api.nvim_buf_line_count(bufnr)
   for i = 0, num_lines do
-    local line_lenses = lenses_by_lnum[i] or {}
+    local line_lenses = lnum_lenses[i] or {}
     api.nvim_buf_clear_namespace(bufnr, ns, i, i + 1)
     local chunks = {}
     local num_line_lenses = #line_lenses
@@ -197,10 +197,10 @@ function M.save(lenses, bufnr, client_id)
   end
 
   local bufstate = bufstates[bufnr] or {}
-  local lenses_by_client = bufstate.client_lenses
-  if not lenses_by_client then
-    lenses_by_client = {}
-    bufstate.client_lenses = lenses_by_client
+  local client_lenses = bufstate.client_lenses
+  if not client_lenses then
+    client_lenses = {}
+    bufstate.client_lenses = client_lenses
     bufstates[bufnr] = bufstate
     local ns = namespaces[client_id]
     api.nvim_buf_attach(bufnr, false, {
@@ -214,7 +214,7 @@ function M.save(lenses, bufnr, client_id)
       end,
     })
   end
-  lenses_by_client[client_id] = lenses
+  client_lenses[client_id] = lenses
 end
 
 ---@param lenses? lsp.CodeLens[]
