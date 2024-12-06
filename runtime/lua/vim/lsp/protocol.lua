@@ -519,6 +519,9 @@ function protocol.make_client_capabilities()
       documentHighlight = {
         dynamicRegistration = false,
       },
+      documentOnTypeFormatting = {
+        dynamicRegistration = false,
+      },
       documentSymbol = {
         dynamicRegistration = false,
         symbolKind = {
