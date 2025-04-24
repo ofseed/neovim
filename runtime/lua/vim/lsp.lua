@@ -303,6 +303,17 @@ local function invalidate_enabled_config(name)
   end
 end
 
+local function notify_change_config(name)
+  local config = lsp.config[name]
+  ---@type lsp.DidChangeConfigurationParams
+  local params = {
+    settings = config.settings,
+  }
+  for _, client in ipairs(lsp.get_clients({ name = name })) do
+    client:notify(ms.workspace_didChangeConfiguration, params)
+  end
+end
+
 --- @param name any
 local function validate_config_name(name)
   validate('name', name, function(value)
@@ -373,6 +384,7 @@ lsp.config = setmetatable({ _configs = {} }, {
     validate('cfg', cfg, 'table', msg)
     invalidate_enabled_config(name)
     self._configs[name] = cfg
+    notify_change_config(name)
   end,
 
   --- @param self vim.lsp.config
@@ -384,6 +396,7 @@ lsp.config = setmetatable({ _configs = {} }, {
     validate('cfg', cfg, 'table', msg)
     invalidate_enabled_config(name)
     self[name] = vim.tbl_deep_extend('force', self._configs[name] or {}, cfg)
+    notify_change_config(name)
   end,
 })
 
