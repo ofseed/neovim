@@ -1818,7 +1818,7 @@ function M.locations_to_items(locations, position_encoding)
 
   ---@type table<string, {start: lsp.Position, end: lsp.Position, location: lsp.Location|lsp.LocationLink}[]>
   local grouped = {}
-  for _, d in ipairs(locations) do
+  for _, d in ipairs(locations or {}) do
     -- locations may be Location or LocationLink
     local uri = d.uri or d.targetUri
     local range = d.range or d.targetSelectionRange
