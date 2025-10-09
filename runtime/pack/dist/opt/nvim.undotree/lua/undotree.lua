@@ -148,16 +148,15 @@ local function undo_fmt_time(time)
     return 'origin'
   end
 
-  local diff = os.time() - time
+  local now = os.time()
 
-  if diff >= 100 then
-    if diff < (60 * 60 * 12) then
-      return os.date('%H:%M:%S', time) --[[@as string]]
-    else
-      return os.date('%Y/%m/%d %H:%M:%S', time) --[[@as string]]
-    end
+  local date = os.date('*t', time) ---@cast date -string
+  local date_now = os.date('*t', now) ---@cast date_now -string
+
+  if date.year == date_now.year and date.month == date_now.month and date.day == date.day then
+    return os.date('%X', time) --[[@as string]]
   else
-    return ('%d second%s ago'):format(diff, diff == 1 and '' or 's')
+    return os.date('%c', time) --[[@as string]]
   end
 end
 
