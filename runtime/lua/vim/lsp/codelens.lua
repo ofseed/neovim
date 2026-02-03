@@ -207,7 +207,9 @@ end
 ---@param toprow integer
 ---@param botrow integer
 function Provider:on_win(toprow, botrow)
-  for row = toprow, botrow do
+  -- Virtual text on the last line's Code Lens pushes it out of the viewport,
+  -- leading to a feedback loop of repeated triggering. Minus one from botrow.
+  for row = toprow, botrow - 1 do
     if self.row_version[row] ~= self.version then
       for client_id, state in pairs(self.client_state) do
         local namespace = state.namespace
@@ -220,12 +222,16 @@ function Provider:on_win(toprow, botrow)
             return a.range.start.character < b.range.start.character
           end)
 
+          local client = assert(vim.lsp.get_client_by_id(client_id))
+          local range = vim.range.lsp(self.bufnr, lenses[1].range, client.offset_encoding)
           ---@type [string, string][]
-          local virt_text = {}
+          local virt_text = {
+            { string.rep(' ', range.start.col), 'LspCodeLensSeparator' },
+          }
+
           for _, lens in ipairs(lenses) do
             -- A code lens is unresolved when no command is associated to it.
             if not lens.command then
-              local client = assert(vim.lsp.get_client_by_id(client_id))
               self:resolve(client, lens)
             else
               vim.list_extend(virt_text, {
@@ -237,13 +243,32 @@ function Provider:on_win(toprow, botrow)
           -- Remove trailing separator.
           table.remove(virt_text)
 
+          -- Use a placeholder to prevent flickering caused by layout shifts.
+          if #virt_text == 1 then
+            table.insert(virt_text, { '', 'LspCodeLens' })
+          end
+
           api.nvim_buf_set_extmark(self.bufnr, namespace, row, 0, {
-            virt_text = virt_text,
-            hl_mode = 'combine',
+            virt_lines = { virt_text },
+            virt_lines_above = true,
+            virt_lines_overflow = 'scroll',
           })
+
+          -- Fix https://github.com/neovim/neovim/issues/16166
+          -- Make sure the code lens on the first line is visible when updating.
+          if row == 0 then
+            vim.cmd('normal! zb')
+          end
         end
         self.row_version[row] = self.version
       end
+    end
+  end
+
+  -- Clear extmarks beyond the bottom of the buffer.
+  if botrow == api.nvim_buf_line_count(self.bufnr) - 1 then
+    for _, state in pairs(self.client_state) do
+      api.nvim_buf_clear_namespace(self.bufnr, state.namespace, botrow, -1)
     end
   end
 end

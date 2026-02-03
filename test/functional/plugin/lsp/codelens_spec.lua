@@ -34,7 +34,8 @@ describe('vim.lsp.codelens', function()
   ]])
 
   local grid_with_lenses = dedent([[
-    struct S { {1:1 implementation}                          |
+    {1:       1 implementation}                              |
+    struct S {                                           |
         a: i32,                                          |
         b: String,                                       |
     }                                                    |
@@ -45,13 +46,13 @@ describe('vim.lsp.codelens', function()
         }                                                |
     }                                                    |
                                                          |
-    fn main() { {1:▶︎ Run }                                   |
+    {1:   ▶︎ Run }                                            |
+    fn main() {                                          |
         let s = S::new(42, String::from("Hello, world!"))|
     ;                                                    |
         println!("S.a: {}, S.b: {}", s.a, s.b);          |
     }                                                    |
     ^                                                     |
-    {1:~                                                    }|*2
                                                          |
   ]])
 
@@ -177,6 +178,27 @@ describe('vim.lsp.codelens', function()
     screen:expect({ grid = grid_with_lenses })
   end)
 
+  it('clears extmarks beyond the bottom of the buffer', function()
+    feed('12G4dd')
+    screen:expect([[
+      {1:       1 implementation}                              |
+      struct S {                                           |
+          a: i32,                                          |
+          b: String,                                       |
+      }                                                    |
+                                                           |
+      impl S {                                             |
+          fn new(a: i32, b: String) -> Self {              |
+              S { a, b }                                   |
+          }                                                |
+      }                                                    |
+                                                           |
+      ^                                                     |
+      {1:~                                                    }|*6
+      4 fewer lines                                        |
+    ]])
+  end)
+
   it('clears code lenses when disabled', function()
     exec_lua(function()
       vim.lsp.codelens.enable(false)
@@ -247,7 +269,8 @@ describe('vim.lsp.codelens', function()
     feed('ggdd')
 
     screen:expect([[
-          ^a: i32, {1:1 implementation}                         |
+      {1:       1 implementation}                              |
+          ^a: i32,                                          |
           b: String,                                       |
       }                                                    |
                                                            |
@@ -257,13 +280,14 @@ describe('vim.lsp.codelens', function()
           }                                                |
       }                                                    |
                                                            |
-      fn main() { {1:▶︎ Run }                                   |
+      {1:   ▶︎ Run }                                            |
+      fn main() {                                          |
           let s = S::new(42, String::from("Hello, world!"))|
       ;                                                    |
           println!("S.a: {}, S.b: {}", s.a, s.b);          |
       }                                                    |
                                                            |
-      {1:~                                                    }|*3
+      {1:~                                                    }|
                                                            |
     ]])
     exec_lua(function()
@@ -274,7 +298,8 @@ describe('vim.lsp.codelens', function()
       )
     end)
     screen:expect([[
-          ^a: i32, {1:1 implementation}                         |
+      {1:       1 implementation}                              |
+          ^a: i32,                                          |
           b: String,                                       |
       }                                                    |
                                                            |
@@ -285,12 +310,13 @@ describe('vim.lsp.codelens', function()
       }                                                    |
                                                            |
       fn main() {                                          |
+      {1:   ▶︎ Run }                                            |
           let s = S::new(42, String::from("Hello, world!"))|
-      ; {1:▶︎ Run }                                             |
+      ;                                                    |
           println!("S.a: {}, S.b: {}", s.a, s.b);          |
       }                                                    |
                                                            |
-      {1:~                                                    }|*3
+      {1:~                                                    }|
                                                            |
     ]])
   end)
