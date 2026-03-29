@@ -68,7 +68,7 @@ local all_clients = {}
 --- (default: `true`)
 --- @field detached? boolean
 ---
---- Decides if/when to force-stop the server after sending the "shutdown" request. See |Client:stop()|.
+--- Decides if/when to force-stop the server after sending the "shutdown" request. See |vim.lsp.Client:stop()|.
 --- Note: when Nvim itself is exiting,
 --- - `false`: Nvim will not force-stop LSP server(s).
 --- - `true`: Nvim will force-stop LSP server(s) that did not comply with the "shutdown" request.
@@ -708,7 +708,7 @@ end
 --- @param bufnr? integer (default: 0) Buffer handle, or 0 for current.
 --- @return boolean status indicates whether the request was successful.
 ---     If it is `false`, then it will always be `false` (the client has shutdown).
---- @return integer? request_id Can be used with |Client:cancel_request()|.
+--- @return integer? request_id Can be used with |vim.lsp.Client:cancel_request()|.
 ---                             `nil` is request failed.
 --- to cancel the-request.
 --- @see |vim.lsp.buf_request_all()|
@@ -774,7 +774,7 @@ end
 
 --- Sends a request to the server and synchronously waits for the response.
 ---
---- This is a wrapper around |Client:request()|
+--- This is a wrapper around |vim.lsp.Client:request()|
 ---
 --- @param method vim.lsp.protocol.Method.ClientToServer.Request LSP method name.
 --- @param params table LSP request params.
@@ -843,7 +843,7 @@ end
 ---
 --- @param id integer id of request to cancel
 --- @return boolean status indicating if the notification was successful.
---- @see |Client:notify()|
+--- @see |vim.lsp.Client:notify()|
 function Client:cancel_request(id)
   self:_process_request(id, 'cancel')
   return self.rpc.notify('$/cancelRequest', { id = id })
@@ -907,7 +907,7 @@ end
 --- Stops a client, then starts a new client with the same config and attached
 --- buffers.
 ---
---- @param force? integer|boolean See [Client:stop()] for details.
+--- @param force? integer|boolean See [vim.lsp.Client:stop()] for details.
 ---                               (default: `self.exit_timeout`)
 function Client:_restart(force)
   validate('force', force, { 'number', 'boolean' }, true)

@@ -269,11 +269,11 @@ LSP
 • |vim.lsp.buf.signature_help()| supports "noActiveParameterSupport".
 • The filter option of |vim.lsp.buf.code_action()| now receives the client ID as an argument.
 • |vim.lsp.ClientConfig| `exit_timeout` decides the time waited before "stop"
-  escalates to "force-stop" for |vim.lsp.enable()|, |Client:stop()|, and
+  escalates to "force-stop" for |vim.lsp.enable()|, |vim.lsp.Client:stop()|, and
   during Nvim shutdown.
   • `exit_timeout` graduated from "experimental" `flags.exit_timeout`
     to a top-level field. Defaults to `false`.
-• |Client:stop()| accepts `force` as an integer, which is treated as the time
+• |vim.lsp.Client:stop()| accepts `force` as an integer, which is treated as the time
   to wait before before stop escalates to force-stop.
 • |vim.lsp.buf.rename()| now highlights the symbol being renamed using the
   |hl-LspReferenceTarget| highlight group.

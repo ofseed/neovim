@@ -1122,7 +1122,7 @@ end
 ---
 ---@deprecated
 ---@param client_id integer|integer[]|vim.lsp.Client[] id, list of id's, or list of |vim.lsp.Client| objects
----@param force? boolean|integer See |Client:stop()|
+---@param force? boolean|integer See |vim.lsp.Client:stop()|
 function lsp.stop_client(client_id, force)
   vim.deprecate('vim.lsp.stop_client()', 'vim.lsp.Client:stop()', '0.13')
   --- @type integer[]|vim.lsp.Client[]

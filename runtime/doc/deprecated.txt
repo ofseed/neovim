@@ -41,7 +41,7 @@ LSP
 • *vim.lsp.get_log_path()*		Use `vim.lsp.log.get_filename()` instead
 • *vim.lsp.get_buffers_by_client_id()*	Use `vim.lsp.get_client_by_id(id).attached_buffers`
 					instead
-• *vim.lsp.stop_client()*		Use |Client:stop()| instead
+• *vim.lsp.stop_client()*		Use |vim.lsp.Client:stop()| instead
 • *vim.lsp.codelens.refresh()*		Use `vim.lsp.codelens.enable(true)` instead
 • *vim.lsp.codelens.clear()*		Use `vim.lsp.codelens.enable(false)` instead
 • *vim.lsp.codelens.display()*
@@ -87,7 +87,7 @@ HIGHLIGHTS
 LSP
 • *vim.lsp.util.jump_to_location*	Use |vim.lsp.util.show_document()| with
 					`{focus=true}` instead.
-• *vim.lsp.buf.execute_command*		Use |Client:exec_cmd()| instead.
+• *vim.lsp.buf.execute_command*		Use |vim.lsp.Client:exec_cmd()| instead.
 • *vim.lsp.buf.completion*		Use |vim.lsp.completion.get()| instead.
 • vim.lsp.buf_request_all		The `error` key has been renamed to `err` inside
 					the result parameter of the handler.
@@ -96,14 +96,14 @@ LSP
 • |vim.lsp.handlers| Does not support client-to-server response handlers. Only
   supports server-to-client requests/notification handlers.
 • *vim.lsp.handlers.signature_help()*	Use |vim.lsp.buf.signature_help()| instead.
-• `client.request()`			Use |Client:request()| instead.
-• `client.request_sync()`		Use |Client:request_sync()| instead.
-• `client.notify()`			Use |Client:notify()| instead.
-• `client.cancel_request()`		Use |Client:cancel_request()| instead.
-• `client.stop()`			Use |Client:stop()| instead.
-• `client.is_stopped()`			Use |Client:is_stopped()| instead.
-• `client.supports_method()`		Use |Client:supports_method()| instead.
-• `client.on_attach()`			Use |Client:on_attach()| instead.
+• `client.request()`			Use |vim.lsp.Client:request()| instead.
+• `client.request_sync()`		Use |vim.lsp.Client:request_sync()| instead.
+• `client.notify()`			Use |vim.lsp.Client:notify()| instead.
+• `client.cancel_request()`		Use |vim.lsp.Client:cancel_request()| instead.
+• `client.stop()`			Use |vim.lsp.Client:stop()| instead.
+• `client.is_stopped()`			Use |vim.lsp.Client:is_stopped()| instead.
+• `client.supports_method()`		Use |vim.lsp.Client:supports_method()| instead.
+• `client.on_attach()`			Use |vim.lsp.Client:on_attach()| instead.
 • `vim.lsp.start_client()`		Use |vim.lsp.start()| instead.
 
 LUA

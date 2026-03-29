@@ -41,6 +41,7 @@ local luacats_grammar = require('gen.luacats_grammar')
 --- @field see? nvim.luacats.parser.note[]
 
 --- @class nvim.luacats.parser.field : nvim.luacats.Field
+--- @field class? string
 --- @field classvar? string
 --- @field nodoc? true
 
@@ -273,6 +274,7 @@ local function fun2field(fun)
     kind = 'field',
     name = fun.name,
     type = table.concat(parts, ''),
+    class = fun.class,
     access = fun.access,
     desc = fun.desc,
     nodoc = fun.nodoc,

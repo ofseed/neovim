@@ -99,6 +99,9 @@ end
 --- @return string
 local function fn_helptag_fmt_common(fun)
   local fn_sfx = fun.table and '' or '()'
+  if fun.class then
+    return fmt('%s:%s%s', fun.class, fun.name, fn_sfx)
+  end
   if fun.classvar then
     return fmt('%s:%s%s', fun.classvar, fun.name, fn_sfx)
   end
@@ -718,7 +721,9 @@ local function render_fun_header(fun, cfg)
   end
 
   local nm = fun.name
-  if fun.classvar then
+  if fun.class then
+    nm = fmt('%s:%s', fun.class, nm)
+  elseif fun.classvar then
     nm = fmt('%s:%s', fun.classvar, nm)
   end
   if nm == 'vim.bo' then
