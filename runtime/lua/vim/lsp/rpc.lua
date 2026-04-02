@@ -517,23 +517,6 @@ function Client:handle_body(body)
       self.notify_reply_callbacks[result_id] = nil
     end
 
-    -- Do not surface RequestCancelled to users, it is RPC-internal.
-    if decoded.error then
-      assert(type(decoded.error) == 'table')
-      if decoded.error.code == protocol.ErrorCodes.RequestCancelled then
-        log.debug('Received cancellation ack', decoded)
-        -- Clear any callback since this is cancelled now.
-        -- This is safe to do assuming that these conditions hold:
-        -- - The server will not send a result callback after this cancellation.
-        -- - If the server sent this cancellation ACK after sending the result, the user of this RPC
-        -- client will ignore the result themselves.
-        if result_id then
-          self.message_callbacks[result_id] = nil
-        end
-        return
-      end
-    end
-
     local callback = self.message_callbacks[result_id]
     if callback then
       self.message_callbacks[result_id] = nil
