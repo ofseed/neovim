@@ -96,7 +96,7 @@ LSP
 
 LUA
 
-• todo
+• Generic JSON-RPC client/server implementation: |json-rpc|.
 
 OPTIONS
 
