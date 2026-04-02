@@ -2645,9 +2645,9 @@ start({cmd}, {dispatchers}, {extra_spawn_params})        *vim.lsp.rpc.start()*
                                 LSP server process
                               • {detached}? (`boolean`) Detach the LSP server
                                 process from the current process
-                              • {env}? (`table<string,string>`) Additional
-                                environment variables for LSP server process.
-                                See |vim.system()|
+                              • {env}? (`table<string,string>`) environment
+                                variables for LSP server process. See
+                                |vim.system()|
 
     Return: ~
         (`vim.lsp.rpc.Client`) See |vim.lsp.rpc.Client|.
