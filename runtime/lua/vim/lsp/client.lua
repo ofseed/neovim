@@ -2,6 +2,7 @@ local uv = vim.uv
 local api = vim.api
 local lsp = vim.lsp
 local log = lsp.log
+local protocol = lsp.protocol
 local changetracking = lsp._changetracking
 local validate = vim.validate
 
@@ -741,6 +742,11 @@ function Client:request(method, params, handler, bufnr)
 
   -- NOTE: rpc.request might call an in-process (Lua) server, thus may be synchronous.
   local success, request_id = self.rpc.request(method, params, function(err, result, request_id)
+    if err and err.code == protocol.ErrorCodes.RequestCancelled then
+      log.debug('Received cancellation ack with id', request_id, 'for method', method)
+      return
+    end
+
     handler(err, result, {
       method = method,
       client_id = self.id,
