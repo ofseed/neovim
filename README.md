@@ -43,6 +43,8 @@ Pre-built packages for Windows, macOS, and Linux are found on the
 
 [Managed packages] are in [Homebrew], [Debian], [Ubuntu], [Fedora], [Arch Linux], [Void Linux], [Gentoo], and more!
 
+[![Packaging status](https://repology.org/badge/vertical-allrepos/neovim.svg?columns=4&exclude_unsupported=1)](https://repology.org/project/neovim/versions)
+
 Install from source
 -------------------
 
