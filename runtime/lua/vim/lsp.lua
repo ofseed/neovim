@@ -1542,8 +1542,11 @@ end
 
 --- Provides a `foldtext` function that shows the `collapsedText` retrieved,
 --- defaults to the first folded line if `collapsedText` is not provided.
-function lsp.foldtext()
-  return vim.lsp._folding_range.foldtext()
+---
+--- The displayed foldtext will be highlighted via tree-sitter.
+---@param lnum? integer line number
+function lsp.foldtext(lnum)
+  return vim.lsp._folding_range.foldtext(lnum)
 end
 
 ---@deprecated Use |vim.lsp.get_client_by_id()| instead.
