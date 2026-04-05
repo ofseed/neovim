@@ -7,6 +7,7 @@ local Capability = require('vim.lsp._capability')
 
 ---@class (private) vim.lsp.codelens.ClientState
 ---@field row_lenses table<integer, lsp.CodeLens[]?> row -> lens
+---@field row_cached table<integer, lsp.CodeLens[]?> row -> cached lens
 ---@field namespace integer
 
 ---@class (private) vim.lsp.codelens.Provider : vim.lsp.Capability
@@ -45,12 +46,32 @@ function Provider:new(bufnr)
   self.row_version = {}
 
   api.nvim_buf_attach(bufnr, false, {
-    on_lines = function(_, buf)
+    on_bytes = function(_, buf, _, start_row, _, _, old_row, _, _, new_row, _, _)
       local provider = Provider.active[buf]
       if not provider then
         return true
       end
       provider:automatic_request()
+      -- Through code lenses will be udpated after response,
+      -- we still maintain row matching so that the cache can be hit.
+      local delta = new_row - old_row
+      if delta == 0 then
+        return
+      -- Cache sould be dirty because we only shift the visible lenses,
+      -- but we only use cache to avoid flickering in the visible range, so it's acceptable.
+      elseif delta > 0 then
+        for _, state in pairs(provider.client_state) do
+          for i = vim.fn.line('w$'), start_row, -1 do
+            state.row_lenses[i + delta] = state.row_lenses[i]
+          end
+        end
+      elseif delta < 0 then
+        for _, state in pairs(provider.client_state) do
+          for i = start_row, vim.fn.line('w$') do
+            state.row_lenses[i + delta] = state.row_lenses[i]
+          end
+        end
+      end
     end,
     on_reload = function(_, buf)
       local provider = Provider.active[buf]
@@ -78,6 +99,7 @@ function Provider:on_attach(client_id)
     state = {
       namespace = api.nvim_create_namespace('nvim.lsp.codelens:' .. client_id),
       row_lenses = {},
+      row_cached = {},
     }
     self.client_state[client_id] = state
   end
@@ -126,6 +148,7 @@ function Provider:handler(err, result, ctx)
     row_lenses[row] = lenses
   end
 
+  state.row_cached = state.row_lenses
   state.row_lenses = row_lenses
   self.version = ctx.version
 
@@ -174,10 +197,14 @@ function Provider:automatic_request()
   end, 200)
 end
 
+--- Resolve a code lens by hitting cache while waiting for response,
+--- update the code lens when response arrives.
+---
 ---@private
 ---@param client vim.lsp.Client
 ---@param unresolved_lens lsp.CodeLens
-function Provider:resolve(client, unresolved_lens)
+---@param index integer Index of the lens in the row, used for cache lookup and update.
+function Provider:resolve(client, unresolved_lens, index)
   ---@param resolved_lens lsp.CodeLens
   client:request('codeLens/resolve', unresolved_lens, function(err, resolved_lens, ctx)
     local state = self.client_state[client.id]
@@ -216,6 +243,11 @@ function Provider:resolve(client, unresolved_lens)
       end
     end
   end, self.bufnr)
+
+  local state = assert(self.client_state[client.id])
+  local caches = state.row_cached[unresolved_lens.range.start.line] or {}
+  local cache = caches[index] or {}
+  unresolved_lens.command = cache.command
 end
 
 ---@package
@@ -243,11 +275,14 @@ function Provider:on_win(toprow, botrow)
             { string.rep(' ', range.start_col), 'LspCodeLensSeparator' },
           }
 
-          for _, lens in ipairs(lenses) do
+          for i, lens in ipairs(lenses) do
             -- A code lens is unresolved when no command is associated to it.
             if not lens.command then
-              self:resolve(client, lens)
-            else
+              self:resolve(client, lens, i)
+            end
+
+            -- Since cache hits are not guaranteed, checks are still necessary.
+            if lens.command then
               vim.list_extend(virt_text, {
                 { lens.command.title, 'LspCodeLens' },
                 { ' | ', 'LspCodeLensSeparator' },
