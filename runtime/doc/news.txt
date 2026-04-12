@@ -106,7 +106,7 @@ LUA
   filetype detection.
 • Added `__eq` metamethod to |vim.VersionRange|. 2 distinct but representing
 the same range instances now compare equal.
-
+• Generic JSON-RPC client/server implementation: |json-rpc|.
 
 OPTIONS
 
