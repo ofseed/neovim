@@ -76,6 +76,32 @@ local function get_content_length(header)
   error('Content-Length not found in header: ' .. header)
 end
 
+--- Parse one framed message from `strbuf`.
+---
+--- Returns a body after consuming one full frame,
+--- returns `nil` if more bytes are needed.
+--- May raises an error if the buffered data is not a valid frame.
+---
+---@param strbuf vim._core.stringbuffer
+---@return string?
+local function parse_content_length(strbuf)
+  local header_end = strbuf:tostring():find('\r\n\r\n', 1, true)
+  if not header_end then
+    return nil
+  end
+
+  local header = strbuf:get(header_end + 1)
+  strbuf:skip(2) -- skip past header boundary
+
+  local content_length = get_content_length(header)
+  if strbuffer.len(strbuf) < content_length then
+    strbuf:set(header .. '\r\n' .. strbuf:tostring())
+    return nil
+  end
+
+  return strbuf:get(content_length)
+end
+
 local M = {}
 
 --- Mapping of error codes used by the client
@@ -190,27 +216,6 @@ local default_dispatchers = {
   end,
 }
 
---- @async
-local function request_parser_loop()
-  local buf = strbuffer.new()
-  while true do
-    local msg = buf:tostring()
-    local header_end = msg:find('\r\n\r\n', 1, true)
-    if header_end then
-      local header = buf:get(header_end + 1)
-      buf:skip(2) -- skip past header boundary
-      local content_length = get_content_length(header)
-      while strbuffer.len(buf) < content_length do
-        buf:put(coroutine.yield())
-      end
-      local body = buf:get(content_length)
-      buf:put(coroutine.yield(body))
-    else
-      buf:put(coroutine.yield())
-    end
-  end
-end
-
 --- @private
 --- @param handle_body fun(body: string)
 --- @param on_exit? fun()
@@ -218,35 +223,25 @@ end
 function M.create_read_loop(handle_body, on_exit, on_error)
   on_exit = on_exit or function() end
   on_error = on_error or function() end
-  local co = coroutine.create(request_parser_loop)
-  coroutine.resume(co)
-  return function(err, chunk)
-    if err then
-      on_error(err, M.client_errors.READ_ERROR)
-      return
-    end
-
-    if not chunk then
-      on_exit()
-      return
-    end
-
-    if coroutine.status(co) == 'dead' then
-      return
-    end
-
-    while true do
-      local ok, res = coroutine.resume(co, chunk)
-      if not ok then
-        on_error(res, M.client_errors.INVALID_SERVER_MESSAGE)
-        break
-      elseif res then
-        handle_body(res)
-        chunk = ''
+  local message_stream = vim_transport.MessageStream.new(
+    parse_content_length,
+    format_message_with_content_length,
+    function(err, chunk)
+      if err then
+        on_error(err, M.client_errors.READ_ERROR)
+      elseif chunk then
+        handle_body(chunk)
       else
-        break
+        on_exit()
       end
+    end,
+    function(err)
+      on_error(err, client_errors.INVALID_SERVER_MESSAGE)
     end
+  )
+
+  return function(err, chunk)
+    message_stream:feed(err, chunk)
   end
 end
 
@@ -256,6 +251,7 @@ end
 --- @field private message_callbacks table<integer, function> dict of message_id to callback
 --- @field private notify_reply_callbacks table<integer, function> dict of message_id to callback
 --- @field private transport vim.Transport
+--- @field private message_stream vim.MessageStream
 --- @field private dispatchers vim.lsp.rpc.Dispatchers
 ---
 --- See [vim.lsp.rpc.request()]
@@ -274,8 +270,10 @@ local Client = {}
 ---@package
 ---@param dispatchers vim.lsp.rpc.Dispatchers
 ---@param transport vim.Transport
+---@param parse fun(buf: vim._core.stringbuffer): string?
+---@param format fun(msg: string): string
 ---@return vim.lsp.rpc.Client
-function Client.new(dispatchers, transport)
+function Client.new(dispatchers, transport, parse, format)
   local result = {
     message_index = 0,
     message_callbacks = {},
@@ -316,27 +314,26 @@ function Client.new(dispatchers, transport)
 
   ---@cast result vim.lsp.rpc.Client
   local self = setmetatable(result, { __index = Client })
-  --- @param body string
-  local function handle_body(body)
-    self:handle_body(body)
-  end
 
-  local function on_exit()
-    ---@diagnostic disable-next-line: invisible
-    self.transport:terminate()
-  end
-
-  --- @param errkind vim.lsp.rpc.ClientErrors
-  local function on_error(err, errkind)
-    self:on_error(errkind, err)
-    if errkind == M.client_errors.INVALID_SERVER_MESSAGE then
+  self.message_stream = vim_transport.MessageStream.new(parse, format, function(err, data)
+    if err then
+      self:on_error(M.client_errors.READ_ERROR, err)
+    elseif data then
+      self:handle_body(data)
+    else
       ---@diagnostic disable-next-line: invisible
       self.transport:terminate()
     end
-  end
+  end, function(err)
+    self:on_error(client_errors.INVALID_SERVER_MESSAGE, err)
+    ---@diagnostic disable-next-line: invisible
+    self.transport:terminate()
+  end)
 
-  local on_read = M.create_read_loop(handle_body, on_exit, on_error)
-  transport:listen(on_read, dispatchers.on_exit)
+  transport:listen(function(err, data)
+    ---@diagnostic disable-next-line: invisible
+    self.message_stream:feed(err, data)
+  end, dispatchers.on_exit)
   return self
 end
 
@@ -348,7 +345,7 @@ function Client:encode_and_send(payload)
   end
   local jsonstr = vim.json.encode(payload)
 
-  self.transport:write(format_message_with_content_length(jsonstr))
+  self.transport:write(self.message_stream.encode(jsonstr))
   return true
 end
 
@@ -615,7 +612,12 @@ function M.connect(host_or_path, port)
     dispatchers = merge_dispatchers(dispatchers)
 
     local transport = vim_transport.TransportConnect.new(host_or_path, port)
-    return Client.new(dispatchers, transport)
+    return Client.new(
+      dispatchers,
+      transport,
+      parse_content_length,
+      format_message_with_content_length
+    )
   end
 end
 
@@ -643,7 +645,12 @@ function M.start(cmd, dispatchers, extra_spawn_params)
   dispatchers = merge_dispatchers(dispatchers)
 
   local transport = vim_transport.TransportRun.new(cmd, extra_spawn_params)
-  return Client.new(dispatchers, transport)
+  return Client.new(
+    dispatchers,
+    transport,
+    parse_content_length,
+    format_message_with_content_length
+  )
 end
 
 return M

@@ -1,5 +1,6 @@
 local uv = vim.uv
 local log = require('vim.lsp.log')
+local strbuffer = require('vim._core.stringbuffer')
 
 --- Interface for transport implementations.
 ---
@@ -182,7 +183,57 @@ function TransportConnect:terminate()
   end
 end
 
+---@class vim.MessageStream
+---@field private strbuf string.buffer
+---@field private parse fun(strbuf: string.buffer): string?
+---@field private on_read fun(err: string?, data: string?)
+---@field private on_error fun(err: any)
+---@field feed fun(self: vim.MessageStream, err: string?, data: string?)
+---@field encode fun(msg: string): string
+local MessageStream = {}
+
+---@param parse fun(strbuf: string.buffer): string?
+---@param encode fun(msg: string): string
+---@param on_read fun(err: string?, data: string?)
+---@param on_error fun(err: any)
+---@return vim.MessageStream
+function MessageStream.new(parse, encode, on_read, on_error)
+  return setmetatable({
+    strbuf = strbuffer.new(),
+    parse = parse,
+    on_read = on_read,
+    on_error = on_error,
+    encode = encode,
+  }, { __index = MessageStream })
+end
+
+---@param err string?
+---@param data string?
+function MessageStream:feed(err, data)
+  if err then
+    self.on_read(err, nil)
+    return
+  elseif data == nil then
+    self.on_read(nil, nil)
+    return
+  end
+
+  self.strbuf:put(data)
+
+  while true do
+    local ok, body = pcall(self.parse, self.strbuf)
+    if not ok then
+      self.on_error(body)
+      return
+    elseif body == nil then
+      break
+    end
+    self.on_read(nil, body)
+  end
+end
+
 return {
   TransportRun = TransportRun,
   TransportConnect = TransportConnect,
+  MessageStream = MessageStream,
 }
