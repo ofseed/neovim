@@ -76,7 +76,7 @@ void nvim_win_set_buf(Window window, Buffer buf, Error *err)
 ///
 /// @param window   |window-ID|, or 0 for current window
 /// @param[out] err Error details, if any
-/// @return (row, col) tuple
+/// @return (lnum, col) tuple
 ArrayOf(Integer, 2) nvim_win_get_cursor(Window window, Arena *arena, Error *err)
   FUNC_API_SINCE(1)
 {
@@ -96,7 +96,7 @@ ArrayOf(Integer, 2) nvim_win_get_cursor(Window window, Arena *arena, Error *err)
 /// This scrolls the window even if it is not the current one.
 ///
 /// @param window   |window-ID|, or 0 for current window
-/// @param pos      (row, col) tuple representing the new position
+/// @param pos      (lnum, col) tuple representing the new position
 /// @param[out] err Error details, if any
 void nvim_win_set_cursor(Window window, ArrayOf(Integer, 2) pos, Error *err)
   FUNC_API_SINCE(1)
@@ -112,10 +112,10 @@ void nvim_win_set_cursor(Window window, ArrayOf(Integer, 2) pos, Error *err)
     return;
   });
 
-  int64_t row = pos.items[0].data.integer;
+  int64_t lnum = pos.items[0].data.integer;
   int64_t col = pos.items[1].data.integer;
 
-  VALIDATE_RANGE(!(row <= 0 || row > win->w_buffer->b_ml.ml_line_count), "cursor line", {
+  VALIDATE_RANGE(!(lnum <= 0 || lnum > win->w_buffer->b_ml.ml_line_count), "cursor line", {
     return;
   });
 
@@ -123,7 +123,7 @@ void nvim_win_set_cursor(Window window, ArrayOf(Integer, 2) pos, Error *err)
     return;
   });
 
-  win->w_cursor.lnum = (linenr_T)row;
+  win->w_cursor.lnum = (linenr_T)lnum;
   win->w_cursor.col = (colnr_T)col;
   win->w_cursor.coladd = 0;
   // When column is out of range silently correct it.

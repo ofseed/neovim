@@ -1131,7 +1131,7 @@ Boolean nvim_buf_set_mark(Buffer buf, String name, Integer line, Integer col, Di
   return res;
 }
 
-/// Returns a `(row,col)` tuple representing the position of the named mark.
+/// Returns a `(lnum, col)` tuple representing the position of the named mark.
 /// "End of line" column position is returned as |v:maxcol| (big number).
 /// See |mark-motions|.
 ///
@@ -1140,7 +1140,7 @@ Boolean nvim_buf_set_mark(Buffer buf, String name, Integer line, Integer col, Di
 /// @param buf     Buffer id, or 0 for current buffer
 /// @param name       Mark name
 /// @param[out] err   Error details, if any
-/// @return (row, col) tuple, (0, 0) if the mark is not set, or is an
+/// @return (lnum, col) tuple, (0, 0) if the mark is not set, or is an
 /// uppercase/file mark set in another buffer.
 /// @see |nvim_buf_set_mark()|
 /// @see |nvim_buf_del_mark()|

@@ -2080,7 +2080,7 @@ Boolean nvim_del_mark(String name, Error *err)
   return res;
 }
 
-/// Returns a `(row, col, buffer, buffername)` tuple representing the position
+/// Returns a `(lnum, col, buffer, buffername)` tuple representing the position
 /// of the uppercase/file named mark. "End of line" column position is returned
 /// as |v:maxcol| (big number). See |mark-motions|.
 ///
@@ -2089,7 +2089,7 @@ Boolean nvim_del_mark(String name, Error *err)
 /// @note Lowercase name (or other buffer-local mark) is an error.
 /// @param name       Mark name
 /// @param opts       Optional parameters. Reserved for future use.
-/// @return 4-tuple (row, col, buffer, buffername), (0, 0, 0, '') if the mark is
+/// @return 4-tuple (lnum, col, buffer, buffername), (0, 0, 0, '') if the mark is
 /// not set.
 /// @see |nvim_buf_set_mark()|
 /// @see |nvim_del_mark()|
@@ -2125,7 +2125,7 @@ Tuple(Integer, Integer, Buffer, String) nvim_get_mark(String name, Dict(empty) *
   }
 
   bool exists = filename != NULL;
-  Integer row;
+  Integer lnum;
   Integer col;
 
   if (!exists || pos.lnum <= 0) {
@@ -2135,15 +2135,15 @@ Tuple(Integer, Integer, Buffer, String) nvim_get_mark(String name, Dict(empty) *
     }
     filename = "";
     bufnr = 0;
-    row = 0;
+    lnum = 0;
     col = 0;
   } else {
-    row = pos.lnum;
+    lnum = pos.lnum;
     col = pos.col;
   }
 
   rv = arena_array(arena, 4);
-  ADD_C(rv, INTEGER_OBJ(row));
+  ADD_C(rv, INTEGER_OBJ(lnum));
   ADD_C(rv, INTEGER_OBJ(col));
   ADD_C(rv, INTEGER_OBJ(bufnr));
   ADD_C(rv, CSTR_TO_ARENA_OBJ(arena, filename));

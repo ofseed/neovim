@@ -481,7 +481,7 @@ function vim.api.nvim_buf_get_keymap(buf, mode) end
 --- @return string[] # Array of lines, or empty array for unloaded buffer.
 function vim.api.nvim_buf_get_lines(buf, start, end_, strict_indexing) end
 
---- Returns a `(row,col)` tuple representing the position of the named mark.
+--- Returns a `(lnum, col)` tuple representing the position of the named mark.
 --- "End of line" column position is returned as `v:maxcol` (big number).
 --- See `mark-motions`.
 ---
@@ -491,7 +491,7 @@ function vim.api.nvim_buf_get_lines(buf, start, end_, strict_indexing) end
 --- @see vim.api.nvim_buf_del_mark
 --- @param buf integer Buffer id, or 0 for current buffer
 --- @param name string Mark name
---- @return [integer, integer] # (row, col) tuple, (0, 0) if the mark is not set, or is an
+--- @return [integer, integer] # (lnum, col) tuple, (0, 0) if the mark is not set, or is an
 --- uppercase/file mark set in another buffer.
 function vim.api.nvim_buf_get_mark(buf, name) end
 
@@ -767,8 +767,8 @@ function vim.api.nvim_buf_set_lines(buf, start, end_, strict_indexing, replaceme
 --- @see vim.api.nvim_buf_get_mark
 --- @param buf integer Buffer to set the mark on
 --- @param name string Mark name
---- @param line integer Line number
---- @param col integer Column/row number
+--- @param line integer Line number (`lnum`, 1-based)
+--- @param col integer Column number
 --- @param opts vim.api.keyset.empty Optional parameters. Reserved for future use.
 --- @return boolean # true if the mark was set, else false.
 function vim.api.nvim_buf_set_mark(buf, name, line, col, opts) end
@@ -1454,7 +1454,7 @@ function vim.api.nvim_get_hl_ns(opts) end
 --- The "buf" key is always zero.
 function vim.api.nvim_get_keymap(mode) end
 
---- Returns a `(row, col, buffer, buffername)` tuple representing the position
+--- Returns a `(lnum, col, buffer, buffername)` tuple representing the position
 --- of the uppercase/file named mark. "End of line" column position is returned
 --- as `v:maxcol` (big number). See `mark-motions`.
 ---
@@ -1467,7 +1467,7 @@ function vim.api.nvim_get_keymap(mode) end
 --- @see vim.api.nvim_del_mark
 --- @param name string Mark name
 --- @param opts vim.api.keyset.empty Optional parameters. Reserved for future use.
---- @return [integer, integer, integer, string] # 4-tuple (row, col, buffer, buffername), (0, 0, 0, '') if the mark is
+--- @return [integer, integer, integer, string] # 4-tuple (lnum, col, buffer, buffername), (0, 0, 0, '') if the mark is
 --- not set.
 function vim.api.nvim_get_mark(name, opts) end
 
@@ -2452,7 +2452,7 @@ function vim.api.nvim_win_get_config(window) end
 ---
 --- @see `:help getcurpos()`
 --- @param window integer `window-ID`, or 0 for current window
---- @return [integer, integer] # (row, col) tuple
+--- @return [integer, integer] # (lnum, col) tuple
 function vim.api.nvim_win_get_cursor(window) end
 
 --- Gets the window height
@@ -2545,7 +2545,7 @@ function vim.api.nvim_win_set_config(window, config) end
 --- This scrolls the window even if it is not the current one.
 ---
 --- @param window integer `window-ID`, or 0 for current window
---- @param pos [integer, integer] (row, col) tuple representing the new position
+--- @param pos [integer, integer] (lnum, col) tuple representing the new position
 function vim.api.nvim_win_set_cursor(window, pos) end
 
 --- Sets the window height.
