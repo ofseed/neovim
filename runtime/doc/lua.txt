@@ -3761,6 +3761,102 @@ vim.loader.reset({path})                                  *vim.loader.reset()*
 
 
 ==============================================================================
+Lua module: vim.log                                                  *vim.log*
+
+The |vim.log| module provides file-backed logger instances.
+
+Use `vim.log.new()` to create a logger, it exposes five writer functions:
+`trace()`, `debug()`, `info()`, `warn()`, and `error()`. They are correspond
+to log levels defined by |vim.log.levels|.
+
+Example: >lua
+    local logger = vim.log.new({ name = 'my-plugin', })
+    -- By default, logs will be written to {name}.log under `stdpath('log')`.
+
+    logger.error('request failed', 'timeout')
+    -- This will write a line like the following to the log file:
+    --   [ERROR][2024-01-01 12:00:00] source.lua:123    request failed    timeout
+
+    -- Set the log level to `INFO`, otherwise the `info()` call below would be ignored,
+    -- since the default level is `WARN`.
+    vim.log.set_level(logger, vim.log.levels.INFO)
+    logger.info('starting', { buf = vim.api.nvim_get_current_buf() })
+    -- This will write a line like the following to the log file:
+    --   [INFO][2024-01-01 12:01:00] source.lua:124    starting    { buf = 1 }
+<
+
+You can also provide a custom formatter function to customize the log output
+format.
+
+
+*vim.Logger*
+
+    Fields: ~
+      • {trace}  (`fun(...:any): boolean?`) Writes a message at
+                 `vim.log.levels.TRACE`.
+      • {debug}  (`fun(...:any): boolean?`) Writes a message at
+                 `vim.log.levels.DEBUG`.
+      • {info}   (`fun(...:any): boolean?`) Writes a message at
+                 `vim.log.levels.INFO`.
+      • {warn}   (`fun(...:any): boolean?`) Writes a message at
+                 `vim.log.levels.WARN`.
+      • {error}  (`fun(...:any): boolean?`) Writes a message at
+                 `vim.log.levels.ERROR`.
+
+
+get_level({logger})                                      *vim.log.get_level()*
+    Gets the current log level.
+
+    Parameters: ~
+      • {logger}  (`vim.Logger`) See |vim.Logger|.
+
+    Return: ~
+        (`vim.log.levels`)
+
+new({opts})                                                    *vim.log.new()*
+    Creates a logger instance.
+
+    The logger writes formatted messages to a file, using a per-instance log
+    level and formatting function.
+
+    Parameters: ~
+      • {opts}  (`table`) A table with the following fields:
+                • {name} (`string`) Display name used in notifications emitted
+                  by the logger.
+                • {current_level}? (`vim.log.levels`, default:
+                  `vim.log.levels.WARN`) Minimum level that will be written.
+                • {format_func}?
+                  (`fun(current_level: vim.log.levels, level: vim.log.levels, ...): string?`)
+                  Formatter used for each log entry. Receives the logger's
+                  current level, the message level, and the values passed to
+                  the writer. Return a string to write an entry, or `nil` to
+                  skip it.
+
+    Return: ~
+        (`vim.Logger`) See |vim.Logger|.
+
+set_format_func({logger}, {func})                  *vim.log.set_format_func()*
+    Sets the formatter used to produce log entries.
+
+    The formatter receives the logger's current level, the message level, and
+    the values passed to the writer method. Return a string to write an entry,
+    or `nil` to skip it.
+
+    Parameters: ~
+      • {logger}  (`vim.Logger`) See |vim.Logger|.
+      • {func}    (`fun(current_level: vim.log.levels, level: vim.log.levels, ...): string?`)
+
+set_level({logger}, {level})                             *vim.log.set_level()*
+    Sets the current log level.
+
+    Entries below this level are skipped.
+
+    Parameters: ~
+      • {logger}  (`vim.Logger`) See |vim.Logger|.
+      • {level}   (`vim.log.levels`)
+
+
+==============================================================================
 Lua module: vim.lpeg                                                *vim.lpeg*
 
 

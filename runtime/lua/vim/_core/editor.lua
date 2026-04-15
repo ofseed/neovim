@@ -11,6 +11,7 @@ for k, v in pairs({
   loader = true,
   func = true,
   F = true,
+  log = true,
   lsp = true,
   hl = true,
   diagnostic = true,
@@ -38,19 +39,6 @@ vim._extra = {
   uri_to_bufnr = true,
   show_pos = true,
   inspect_pos = true,
-}
-
---- @nodoc
-vim.log = {
-  --- @enum vim.log.levels
-  levels = {
-    TRACE = 0,
-    DEBUG = 1,
-    INFO = 2,
-    WARN = 3,
-    ERROR = 4,
-    OFF = 5,
-  },
 }
 
 local utfs = {
