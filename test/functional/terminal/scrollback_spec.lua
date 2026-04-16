@@ -94,6 +94,10 @@ local function test_terminal_scrollback(hide_curbuf)
     may_restore_curbuf()
   end
 
+  local function get_extmarks(ns)
+    return api.nvim_buf_get_extmarks(buf, ns, 0, -1, {})
+  end
+
   before_each(function()
     clear()
     command('set nostartofline jumpoptions+=view')
@@ -839,6 +843,60 @@ local function test_terminal_scrollback(hide_curbuf)
     eq(scrollback + term_height, fn.line('.'))
     screen:expect_unchanged(hide_curbuf)
     eq({ 0, scrollback + 1, 4, 0 }, n.fn.getpos("'m"))
+  end)
+
+  describe('terminal clears extmarks', function()
+    it('removes extmarks on ED 2', function()
+      feed_lines('line', 1, 4)
+      local ns = api.nvim_create_namespace('test-clear-screen')
+      api.nvim_buf_set_extmark(buf, ns, 2, 0, { end_col = 5, hl_group = 'ErrorMsg' })
+
+      feed_data('\027[2J')
+      retry(nil, nil, function()
+        eq({}, get_extmarks(ns))
+      end)
+    end)
+
+    it('removes only overlapping extmarks on partial erases', function()
+      feed_lines('line', 1, 4)
+      local ns = api.nvim_create_namespace('test-partial-erase')
+      local keep = api.nvim_buf_set_extmark(buf, ns, 2, 4, { end_col = 5, hl_group = 'ErrorMsg' })
+      api.nvim_buf_set_extmark(buf, ns, 2, 0, { end_col = 2, hl_group = 'ErrorMsg' })
+
+      feed_data('\027[3;1H\027[2X')
+      retry(nil, nil, function()
+        eq({ { keep, 2, 4 } }, get_extmarks(ns))
+      end)
+    end)
+
+    it('removes extmarks when ED 3 clears scrollback rows', function()
+      feed_lines('line', 1, 30)
+      local ns = api.nvim_create_namespace('test-clear-scrollback')
+      api.nvim_buf_set_extmark(buf, ns, 2, 0, { end_col = 6, hl_group = 'ErrorMsg' })
+
+      feed_data('\027[3J')
+      retry(nil, nil, function()
+        eq({}, get_extmarks(ns))
+      end)
+    end)
+
+    it("removes extmarks when reducing 'scrollback' discards rows", function()
+      feed_lines('line', 1, 30)
+      local term_height = 6
+      local scrollback = api.nvim_get_option_value('scrollback', { buf = buf })
+      local ns = api.nvim_create_namespace('test-shrink-scrollback')
+      api.nvim_buf_set_extmark(buf, ns, 0, 0, { end_col = 6, hl_group = 'ErrorMsg' })
+
+      scrollback = scrollback - 2
+      may_hide_curbuf()
+      api.nvim_set_option_value('scrollback', scrollback, { buf = buf })
+      may_restore_curbuf()
+
+      eq(scrollback + term_height, fn.line('$'))
+      retry(nil, nil, function()
+        eq({}, get_extmarks(ns))
+      end)
+    end)
   end)
 end
 

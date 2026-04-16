@@ -233,6 +233,40 @@ describe(':terminal window', function()
 
       eq(4, fn.foldclosedend(2))
     end)
+
+    it('clears manual folds when the terminal erases whole lines', function()
+      feed_data('one\ntwo\nthree\n')
+      retry(nil, nil, function()
+        eq('three', fn.getline(4))
+      end)
+
+      feed('<C-\\><C-N>')
+      command('setlocal foldenable foldmethod=manual')
+      command('2,4fold')
+      eq(4, fn.foldclosedend(2))
+
+      feed_data('\027[2J')
+      retry(nil, nil, function()
+        eq(-1, fn.foldclosedend(2))
+      end)
+    end)
+
+    it('keeps manual folds on partial erases', function()
+      feed_data('one\ntwo\nthree\n')
+      retry(nil, nil, function()
+        eq('three', fn.getline(4))
+      end)
+
+      feed('<C-\\><C-N>')
+      command('setlocal foldenable foldmethod=manual')
+      command('2,4fold')
+      eq(4, fn.foldclosedend(2))
+
+      feed_data('\027[2;2H\027[K')
+      retry(nil, nil, function()
+        eq(4, fn.foldclosedend(2))
+      end)
+    end)
   end)
 
   it('redrawn when restoring cursorline/column', function()

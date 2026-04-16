@@ -2644,6 +2644,37 @@ static void foldRemove(win_T *const wp, garray_T *gap, linenr_T top, linenr_T bo
   }
 }
 
+void foldRemoveManual(buf_T *buf, linenr_T top, linenr_T bot)
+{
+  if (bot < top) {
+    return;
+  }
+
+  FOR_ALL_TAB_WINDOWS(tp, wp) {
+    if (wp->w_buffer != buf || !foldmethodIsManual(wp) || GA_EMPTY(&wp->w_folds)) {
+      continue;
+    }
+
+    fold_changed = false;
+    foldRemove(wp, &wp->w_folds, top, bot);
+    if (fold_changed && wp->w_p_fen) {
+      changed_window_setting(wp);
+    }
+  }
+
+  win_T fakewin = { .w_buffer = buf };
+  for (size_t i = 0; i < kv_size(buf->b_wininfo); i++) {
+    WinInfo *wip = kv_A(buf->b_wininfo, i);
+    if (!wip->wi_optset || wip->wi_opt.wo_fdm[0] == NUL || wip->wi_opt.wo_fdm[3] != 'u'
+        || GA_EMPTY(&wip->wi_folds)) {
+      continue;
+    }
+
+    fold_changed = false;
+    foldRemove(&fakewin, &wip->wi_folds, top, bot);
+  }
+}
+
 // foldReverseOrder() {{{2
 static void foldReverseOrder(garray_T *gap, const linenr_T start_arg, const linenr_T end_arg)
 {

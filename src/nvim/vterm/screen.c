@@ -249,6 +249,9 @@ static int erase_user(VTermRect rect, int selective, void *user)
 {
   VTermScreen *screen = user;
 
+  if (screen->callbacks && screen->callbacks->erase) {
+    (*screen->callbacks->erase)(rect, selective, screen->cbdata);
+  }
   damagerect(screen, rect);
 
   return 1;

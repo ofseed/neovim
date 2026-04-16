@@ -64,6 +64,8 @@
 #include "nvim/event/multiqueue.h"
 #include "nvim/event/time.h"
 #include "nvim/ex_docmd.h"
+#include "nvim/extmark.h"
+#include "nvim/fold.h"
 #include "nvim/getchar.h"
 #include "nvim/globals.h"
 #include "nvim/grid.h"
@@ -137,10 +139,15 @@ typedef struct {
 static TimeWatcher refresh_timer;
 static bool refresh_pending = false;
 
+typedef kvec_t(VTermRect) VTermRectVec;
+
 typedef struct {
   size_t cols;
   VTermScreenCell cells[];
 } ScrollbackLine;
+
+static int term_erase(VTermRect rect, int selective, void *data);
+static void term_clear_deleted_extmarks(buf_T *buf, linenr_T first, linenr_T last);
 
 struct terminal {
   TerminalOptions opts;  // options passed to terminal_alloc()
@@ -195,6 +202,7 @@ struct terminal {
     bool cursor;          ///< pending cursor shape or blink change
     StringBuilder *send;  ///< When there is a pending TermRequest autocommand, block and store input.
     MultiQueue *events;   ///< Events waiting for refresh.
+    VTermRectVec erases;  ///< Terminal-native erase rectangles pending refresh.
   } pending;
 
   bool theme_updates;  ///< Send a theme update notification when 'bg' changes
@@ -214,6 +222,7 @@ struct terminal {
 
 static VTermScreenCallbacks vterm_screen_callbacks = {
   .damage = term_damage,
+  .erase = term_erase,
   .moverect = term_moverect,
   .movecursor = term_movecursor,
   .settermprop = term_settermprop,
@@ -564,6 +573,9 @@ Terminal *terminal_alloc(buf_T *buf, TerminalOptions opts)
 
   if (!(buf->b_ml.ml_flags & ML_EMPTY)) {
     linenr_T line_count = buf->b_ml.ml_line_count;
+    term_clear_deleted_extmarks(buf, 1, line_count);
+    mark_adjust_buf(buf, 1, line_count, MAXLNUM, -line_count, true,
+                    kMarkAdjustTerm, kExtmarkUndo);
     while (!(buf->b_ml.ml_flags & ML_EMPTY)) {
       ml_delete_buf(buf, 1, false);
     }
@@ -1230,6 +1242,7 @@ void terminal_destroy(Terminal **termpp)
     xfree(term->selection_buffer);
     kv_destroy(term->selection);
     kv_destroy(term->termrequest_buffer);
+    kv_destroy(term->pending.erases);
     vterm_free(term->vt);
     xfree(term->pending.send);
     multiqueue_free(term->pending.events);
@@ -1539,6 +1552,15 @@ static void terminal_focus(const Terminal *term, bool focus)
 static int term_damage(VTermRect rect, void *data)
 {
   invalidate_terminal(data, rect.start_row, rect.end_row);
+  return 1;
+}
+
+static int term_erase(VTermRect rect, int selective, void *data)
+{
+  Terminal *term = data;
+
+  kv_push(term->pending.erases, rect);
+  (void)selective;
   return 1;
 }
 
@@ -2340,6 +2362,110 @@ static bool fetch_cell(Terminal *term, int row, int col, VTermScreenCell *cell)
   return true;
 }
 
+static void term_clear_deleted_extmarks(buf_T *buf, linenr_T first, linenr_T last)
+{
+  if (first < 1 || first > last) {
+    return;
+  }
+
+  last = MIN(last, buf->b_ml.ml_line_count);
+  if (first > last) {
+    return;
+  }
+
+  extmark_clear_overlapping(buf, first - 1, 0, last - 1, MAXCOL);
+}
+
+static colnr_T term_line_cell_to_byte(const char *line, int cell_col, bool end_bound)
+{
+  if (cell_col <= 0) {
+    return 0;
+  }
+
+  colnr_T byte_col = 0;
+  int cur_col = 0;
+  while (line[byte_col] != NUL) {
+    int cells = utf_ptr2cells(line + byte_col);
+    int len = utfc_ptr2len(line + byte_col);
+
+    if (cell_col < cur_col + cells) {
+      return end_bound ? byte_col + len : byte_col;
+    }
+
+    cur_col += cells;
+    byte_col += len;
+    if (cell_col == cur_col) {
+      return byte_col;
+    }
+  }
+
+  return MAXCOL;
+}
+
+static void term_clear_erase_rect(Terminal *term, buf_T *buf, VTermRect rect, int width)
+{
+  if (rect.start_row >= rect.end_row || rect.start_col >= rect.end_col) {
+    return;
+  }
+
+  if (rect.start_col == 0 && rect.end_col >= width) {
+    linenr_T first = row_to_linenr(term, rect.start_row);
+    linenr_T last = row_to_linenr(term, rect.end_row - 1);
+
+    first = MAX(first, 1);
+    last = MIN(last, buf->b_ml.ml_line_count);
+    if (first > last) {
+      return;
+    }
+
+    term_clear_deleted_extmarks(buf, first, last);
+    foldRemoveManual(buf, first, last);
+    return;
+  }
+
+  for (int row = rect.start_row; row < rect.end_row; row++) {
+    linenr_T lnum = row_to_linenr(term, row);
+    if (lnum < 1 || lnum > buf->b_ml.ml_line_count) {
+      continue;
+    }
+
+    const char *line = ml_get_buf(buf, lnum);
+    colnr_T start_col = term_line_cell_to_byte(line, rect.start_col, false);
+    if (start_col == MAXCOL) {
+      continue;
+    }
+
+    colnr_T end_col = term_line_cell_to_byte(line, rect.end_col, true);
+    if (end_col != MAXCOL && end_col <= start_col) {
+      continue;
+    }
+
+    extmark_clear_overlapping(buf, lnum - 1, start_col, lnum - 1, end_col);
+  }
+}
+
+static void term_process_erases(Terminal *term, buf_T *buf)
+{
+  if (kv_size(term->pending.erases) == 0) {
+    return;
+  }
+
+  int width;
+  int height;
+  vterm_get_size(term->vt, &height, &width);
+
+  for (size_t i = 0; i < kv_size(term->pending.erases); i++) {
+    VTermRect rect = kv_A(term->pending.erases, i);
+    rect.start_row = MAX(rect.start_row, 0);
+    rect.end_row = MIN(rect.end_row, height);
+    rect.start_col = MAX(rect.start_col, 0);
+    rect.end_col = MIN(rect.end_col, width);
+    term_clear_erase_rect(term, buf, rect, width);
+  }
+
+  term->pending.erases.size = 0;
+}
+
 // queue a terminal instance for refresh
 static void invalidate_terminal(Terminal *term, int start_row, int end_row)
 {
@@ -2380,6 +2506,7 @@ static void refresh_terminal(Terminal *term)
 
   bool resized = refresh_size(term, buf);
   refresh_scrollback(term, buf);
+  term_process_erases(term, buf);
   refresh_screen(term, buf);
 
   int ml_added = buf->b_ml.ml_line_count - ml_before;
@@ -2514,6 +2641,7 @@ static void adjust_scrollback(Terminal *term, buf_T *buf)
   // Delete lines exceeding the new 'scrollback' limit.
   if (scbk < term->sb_current) {
     size_t diff = term->sb_current - scbk;
+    term_clear_deleted_extmarks(buf, 1, (linenr_T)diff);
     for (size_t i = 0; i < diff; i++) {
       ml_delete_buf(buf, 1, false);
       term->sb_current--;
@@ -2542,6 +2670,7 @@ static void refresh_scrollback(Terminal *term, buf_T *buf)
 
   linenr_T deleted = (linenr_T)(term->sb_deleted - term->old_sb_deleted);
   deleted = MIN(deleted, buf->b_ml.ml_line_count);
+  term_clear_deleted_extmarks(buf, 1, deleted);
   mark_adjust_buf(buf, 1, deleted, MAXLNUM, -deleted, true, kMarkAdjustTerm, kExtmarkUndo);
   term->old_sb_deleted = term->sb_deleted;
 
@@ -2573,6 +2702,11 @@ static void refresh_scrollback(Terminal *term, buf_T *buf)
 
   int max_line_count = (int)term->sb_current + height;
   // Remove extra lines at the bottom.
+  if (buf->b_ml.ml_line_count > max_line_count) {
+    linenr_T first = (linenr_T)max_line_count + 1;
+    linenr_T last = buf->b_ml.ml_line_count;
+    term_clear_deleted_extmarks(buf, first, last);
+  }
   while (buf->b_ml.ml_line_count > max_line_count) {
     ml_delete_buf(buf, buf->b_ml.ml_line_count, false);
     deleted_lines_buf(buf, buf->b_ml.ml_line_count, 1);
