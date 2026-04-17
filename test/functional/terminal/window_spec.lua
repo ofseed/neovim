@@ -267,6 +267,25 @@ describe(':terminal window', function()
         eq(4, fn.foldclosedend(2))
       end)
     end)
+
+    it('keeps manual folds when erase and scroll happen in the same refresh', function()
+      feed_data('one\ntwo\nthree\n')
+      retry(nil, nil, function()
+        eq('three', fn.getline(4))
+      end)
+
+      feed('<C-\\><C-N>')
+      command('setlocal foldenable foldmethod=manual scrollback=0')
+      command('2,4fold')
+      eq(4, fn.foldclosedend(2))
+
+      feed_data('\027[H\027[2K\027[6;1H\n')
+      retry(nil, nil, function()
+        eq(true, fn.foldclosedend(1) ~= -1
+          or fn.foldclosedend(2) ~= -1
+          or fn.foldclosedend(3) ~= -1)
+      end)
+    end)
   end)
 
   it('redrawn when restoring cursorline/column', function()
