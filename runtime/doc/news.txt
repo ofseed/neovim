@@ -163,6 +163,8 @@ PERFORMANCE
   functions, which skips the Vimscript <=> Lua "bridge" (no data
   conversion/marshalling) entirely, if the `vim.fn` function is called from
   Lua.
+• The table holding LSP data is now cleared using `table.clear`,
+  thus reducing GC and memory reallocation during each data reset.
 
 PLUGINS
 
