@@ -206,6 +206,19 @@ function M.to_extmark(pos)
 
   local row = pos.row
   local col = pos.col
+  -- Consider a buffer like this:
+  -- ```
+  -- 0123456
+  -- abcdefg
+  -- ```
+  --
+  -- Two ways to describe the range of the first line, i.e. '0123456':
+  -- 1. `{ start_row = 0, start_col = 0, end_row = 0, end_col = 7 }`
+  -- 2. `{ start_row = 0, start_col = 0, end_row = 1, end_col = 0 }`
+  --
+  -- Both of the above methods satisfy the "end-exclusive" definition,
+  -- but `nvim_buf_set_extmark()` throws an out-of-bounds error for the second method,
+  -- so we need to convert it to the first method.
   if pos.col == 0 and pos.row == line_count then
     row = row - 1
     col = #get_line(pos.buf, row)
