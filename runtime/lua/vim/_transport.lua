@@ -1,5 +1,6 @@
 local uv = vim.uv
 local log = require('vim.lsp.log')
+local strbuffer = require('vim._core.stringbuffer')
 
 --- Interface for transport implementations.
 ---
@@ -183,37 +184,34 @@ function TransportConnect:terminate()
 end
 
 ---@class (private) vim.MessageStream
----@field private co thread
----@field private parse fun()
+---@field private strbuf string.buffer
+---@field private parse fun(strbuf: string.buffer): string?
 ---@field private on_read fun(err: string?, data: string?)
 ---@field private on_error fun(err: any)
 ---@field feed fun(self: vim.MessageStream, err: string?, data: string?)
 ---@field format fun(msg: string): string
 local MessageStream = {}
 
---- Create a message stream from a coroutine parser.
+--- Create a message stream from a parser.
 ---
---- The parser receives transport data from `coroutine.yield()`
---- and may yield a message body when a full message is available.
---- A nil yield means it needs more transport data.
+--- The parser consumes from the given string buffer
+--- and returns a message body when a full message is available.
+--- `nil` means it needs more transport data.
 --- Parser errors are reported through `on_error`.
 ---
----@param parse fun()
+---@param parse fun(strbuf: string.buffer): string?
 ---@param format fun(msg: string): string
 ---@param on_read fun(err: string?, data: string?)
 ---@param on_error fun(err: any)
 ---@return vim.MessageStream
 function MessageStream.new(parse, format, on_read, on_error)
-  local self = setmetatable({
-    co = coroutine.create(parse),
+  return setmetatable({
+    strbuf = strbuffer.new(),
     parse = parse,
     on_read = on_read,
     on_error = on_error,
     format = format,
   }, { __index = MessageStream })
-
-  coroutine.resume(self.co)
-  return self
 end
 
 ---@param err string?
@@ -227,8 +225,10 @@ function MessageStream:feed(err, data)
     return
   end
 
+  self.strbuf:put(data)
+
   while true do
-    local ok, body = coroutine.resume(self.co, data)
+    local ok, body = pcall(self.parse, self.strbuf)
     if not ok then
       self.on_error(body)
       return
@@ -236,7 +236,6 @@ function MessageStream:feed(err, data)
       break
     end
     self.on_read(nil, body)
-    data = ''
   end
 end
 
