@@ -182,7 +182,66 @@ function TransportConnect:terminate()
   end
 end
 
+---@class (private) vim.MessageStream
+---@field private co thread
+---@field private parse fun()
+---@field private on_read fun(err: string?, data: string?)
+---@field private on_error fun(err: any)
+---@field feed fun(self: vim.MessageStream, err: string?, data: string?)
+---@field format fun(msg: string): string
+local MessageStream = {}
+
+--- Create a message stream from a coroutine parser.
+---
+--- The parser receives transport data from `coroutine.yield()`
+--- and may yield a message body when a full message is available.
+--- A nil yield means it needs more transport data.
+--- Parser errors are reported through `on_error`.
+---
+---@param parse fun()
+---@param format fun(msg: string): string
+---@param on_read fun(err: string?, data: string?)
+---@param on_error fun(err: any)
+---@return vim.MessageStream
+function MessageStream.new(parse, format, on_read, on_error)
+  local self = setmetatable({
+    co = coroutine.create(parse),
+    parse = parse,
+    on_read = on_read,
+    on_error = on_error,
+    format = format,
+  }, { __index = MessageStream })
+
+  coroutine.resume(self.co)
+  return self
+end
+
+---@param err string?
+---@param data string?
+function MessageStream:feed(err, data)
+  if err then
+    self.on_read(err, nil)
+    return
+  elseif data == nil then
+    self.on_read(nil, nil)
+    return
+  end
+
+  while true do
+    local ok, body = coroutine.resume(self.co, data)
+    if not ok then
+      self.on_error(body)
+      return
+    elseif body == nil then
+      break
+    end
+    self.on_read(nil, body)
+    data = ''
+  end
+end
+
 return {
   TransportRun = TransportRun,
   TransportConnect = TransportConnect,
+  MessageStream = MessageStream,
 }
