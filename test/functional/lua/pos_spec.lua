@@ -74,6 +74,13 @@ describe('vim.pos', function()
       end)
     )
     eq(
+      false,
+      exec_lua(function()
+        local other_buf = vim.api.nvim_create_buf(false, true)
+        return vim.pos(buf, 3, 5) == vim.pos(other_buf, 3, 5)
+      end)
+    )
+    eq(
       true,
       exec_lua(function()
         return vim.pos(buf, 3, 5) ~= vim.pos(buf, 3, 6)

@@ -96,7 +96,7 @@ end
 ---@param p1 vim.Pos
 ---@param p2 vim.Pos
 function M.__eq(p1, p2)
-  return util.cmp_pos.eq(p1[1], p1[2], p2[1], p2[2])
+  return p1.buf == p2.buf and util.cmp_pos.eq(p1[1], p1[2], p2[1], p2[2])
 end
 
 --- Converts |vim.Pos| to `lsp.Position`.

@@ -53,6 +53,16 @@ describe('vim.range', function()
       end)
     end)
     eq(success, false)
+    eq(
+      { true, false },
+      exec_lua(function()
+        local range = vim.range(buf1, 3, 5, 4, 6)
+        return {
+          range == vim.range(buf1, 3, 5, 4, 6),
+          range == vim.range(buf2, 3, 5, 4, 6),
+        }
+      end)
+    )
   end)
 
   it('converts between vim.Range and lsp.Range', function()

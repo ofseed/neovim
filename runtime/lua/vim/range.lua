@@ -174,7 +174,9 @@ end
 ---@param r1 vim.Range
 ---@param r2 vim.Range
 function M.__eq(r1, r2)
-  return util.cmp_pos.eq(r1[1], r1[2], r2[1], r2[2]) and util.cmp_pos.eq(r1[3], r1[4], r2[3], r2[4])
+  return r1.buf == r2.buf
+    and util.cmp_pos.eq(r1[1], r1[2], r2[1], r2[2])
+    and util.cmp_pos.eq(r1[3], r1[4], r2[3], r2[4])
 end
 
 --- Checks whether the given range is empty; i.e., start >= end.
