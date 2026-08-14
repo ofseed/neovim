@@ -83,6 +83,26 @@ describe('vim.pos', function()
     )
   end)
 
+  it('checks whether a position is valid', function()
+    eq(
+      { true, true, true, false, false, false },
+      exec_lua(function()
+        vim.api.nvim_buf_set_lines(0, 0, -1, true, { 'first', 'second' })
+        local unloaded_buf = vim.api.nvim_create_buf(true, false)
+        vim.api.nvim_buf_delete(unloaded_buf, { unload = true })
+
+        return {
+          vim.pos(0, 0, 0):is_valid(),
+          vim.pos(0, 1, 6):is_valid(),
+          vim.pos(0, 2, 0):is_valid(),
+          vim.pos(0, -1, 0):is_valid(),
+          vim.pos(0, 0, 6):is_valid(),
+          vim.pos(unloaded_buf, 0, 0):is_valid(),
+        }
+      end)
+    )
+  end)
+
   it('converts between vim.Pos and lsp.Position', function()
     local buf = exec_lua(function()
       return vim.api.nvim_get_current_buf()

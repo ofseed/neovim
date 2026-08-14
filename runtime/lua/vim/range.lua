@@ -186,6 +186,25 @@ function M.is_empty(range)
   return util.cmp_pos.ge(range[1], range[2], range[3], range[4])
 end
 
+--- Checks whether the given range is valid;
+--- i.e., whether this range corresponds to the buffer content.
+---
+---@param range vim.Range
+---@return boolean `true` if the given range is empty.
+function M.is_valid(range)
+  validate('range', range, 'table')
+
+  if M.is_empty(range) then
+    return false
+  end
+
+  local buf, start_row, start_col, end_row, end_col =
+    range.buf, range[1], range[2], range[3], range[4]
+  end_row, end_col = to_inclusive_pos(buf, end_row, end_col)
+
+  return util.is_valid(buf, start_row, start_col) and util.is_valid(buf, end_row, end_col)
+end
+
 --- Checks whether {outer} range contains {inner} range or position.
 ---
 ---@param outer vim.Range

@@ -128,6 +128,26 @@ end
 ---@param buf integer
 ---@param row integer
 ---@param col integer
+function M.is_valid(buf, row, col)
+  -- TODO(ofseed): We may want to check whether a pos is valid on unloaded buffers.
+  if not vim.api.nvim_buf_is_loaded(buf) then
+    return false
+  end
+
+  if row < 0 or row > api.nvim_buf_line_count(buf) then
+    return false
+  end
+
+  if col < 0 or col > #vim.api.nvim_buf_get_lines(buf, row, row + 1, true)[1] then
+    return false
+  end
+
+  return true
+end
+
+---@param buf integer
+---@param row integer
+---@param col integer
 ---@param position_encoding lsp.PositionEncodingKind
 function M.to_lsp(buf, row, col, position_encoding)
   -- When on the first character,

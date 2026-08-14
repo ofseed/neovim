@@ -226,6 +226,26 @@ describe('vim.range', function()
     )
   end)
 
+  it('checks whether a range is valid', function()
+    eq(
+      { true, true, false, false, false, false },
+      exec_lua(function()
+        vim.api.nvim_buf_set_lines(0, 0, -1, true, { 'first', 'second' })
+        local unloaded_buf = vim.api.nvim_create_buf(true, false)
+        vim.api.nvim_buf_delete(unloaded_buf, { unload = true })
+
+        return {
+          vim.range(0, 0, 0, 0, 5):is_valid(),
+          vim.range(0, 0, 0, 2, 0):is_valid(),
+          vim.range(0, 0, 0, 0, 0):is_valid(),
+          vim.range(0, 0, 6, 1, 0):is_valid(),
+          vim.range(0, 0, 0, 0, 7):is_valid(),
+          vim.range(unloaded_buf, 0, 0, 0, 1):is_valid(),
+        }
+      end)
+    )
+  end)
+
   it('1 byte wide range is not empty', function()
     eq(
       false,

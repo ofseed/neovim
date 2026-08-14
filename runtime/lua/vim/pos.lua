@@ -99,6 +99,17 @@ function M.__eq(p1, p2)
   return util.cmp_pos.eq(p1[1], p1[2], p2[1], p2[2])
 end
 
+--- Checks whether the given range is valid;
+--- i.e., whether this range is within the bounds of the buffer.
+---
+---@param pos vim.Pos
+---@return boolean
+function M.is_valid(pos)
+  validate('pos', pos, 'table')
+
+  return util.is_valid(pos.buf, pos[1], pos[2])
+end
+
 --- Converts |vim.Pos| to `lsp.Position`.
 ---
 --- Example:
